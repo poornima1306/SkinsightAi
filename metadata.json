@@ -1,0 +1,6 @@
+{
+  "name": "SkinSight AI",
+  "description": "AI-assisted skin lesion screening and guidance prototype with explainable Grad-CAM visualization and interactive assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
