@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { ImageUploader } from './components/ImageUploader';
@@ -6,6 +6,7 @@ import { AnalysisProgress } from './components/AnalysisProgress';
 import { ResultsCard } from './components/ResultsCard';
 import { Chatbot } from './components/Chatbot';
 import { HeatmapModal } from './components/HeatmapModal';
+import { ModelTrainingStudioModal } from './components/ModelTrainingStudioModal';
 import { MedicalDisclaimer } from './components/MedicalDisclaimer';
 import { SkinAnalysisResult } from './types';
 import { analyzeSkinImage } from './services/mockDermService';
@@ -18,22 +19,35 @@ export default function App() {
     presetId?: string;
   } | null>(null);
 
+  const currentImageRef = useRef<string | null>(null);
+  const currentFileInfoRef = useRef<{ name: string; size: string; presetId?: string } | null>(null);
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<SkinAnalysisResult | null>(null);
   const [isHeatmapModalOpen, setIsHeatmapModalOpen] = useState(false);
+  const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false);
+  const [activeModelName, setActiveModelName] = useState<string>('Stacked Ensemble (98.4%)');
   const [externalChatTrigger, setExternalChatTrigger] = useState<string | null>(null);
 
   const handleImageSelected = (
     imageDataUrl: string,
-    info: { name: string; size: string; presetId?: string }
+    info: { name: string; size: string; presetId?: string },
+    immediateAnalyze?: boolean
   ) => {
+    currentImageRef.current = imageDataUrl;
+    currentFileInfoRef.current = info;
     setSelectedImage(imageDataUrl);
     setFileInfo(info);
     // Reset previous analysis result when new image is picked
     setAnalysisResult(null);
+    if (immediateAnalyze) {
+      setIsAnalyzing(true);
+    }
   };
 
   const handleClearImage = () => {
+    currentImageRef.current = null;
+    currentFileInfoRef.current = null;
     setSelectedImage(null);
     setFileInfo(null);
     setAnalysisResult(null);
@@ -41,17 +55,23 @@ export default function App() {
   };
 
   const handleStartAnalysis = async () => {
-    if (!selectedImage) return;
+    const img = currentImageRef.current || selectedImage;
+    if (!img) return;
     setIsAnalyzing(true);
   };
 
   // Called when the step-by-step progress animation finishes
   const handleProgressComplete = async () => {
-    if (!selectedImage) return;
+    const img = currentImageRef.current || selectedImage;
+    const info = currentFileInfoRef.current || fileInfo;
+    if (!img) {
+      setIsAnalyzing(false);
+      return;
+    }
     try {
-      const result = await analyzeSkinImage(selectedImage, {
-        fileName: fileInfo?.name,
-        presetId: fileInfo?.presetId,
+      const result = await analyzeSkinImage(img, {
+        fileName: info?.name,
+        presetId: info?.presetId,
       });
       setAnalysisResult(result);
     } catch (err) {
@@ -62,6 +82,8 @@ export default function App() {
   };
 
   const handleResetAll = () => {
+    currentImageRef.current = null;
+    currentFileInfoRef.current = null;
     setSelectedImage(null);
     setFileInfo(null);
     setAnalysisResult(null);
@@ -71,11 +93,6 @@ export default function App() {
 
   const handleAskChatbot = (query?: string) => {
     setExternalChatTrigger(query || 'What does this result mean?');
-    // On mobile, scroll chat into view smoothly
-    const chatElement = document.getElementById('chatbot-workspace');
-    if (chatElement) {
-      chatElement.scrollIntoView({ behavior: 'smooth' });
-    }
   };
 
   return (
@@ -84,6 +101,8 @@ export default function App() {
       <Header
         onReset={handleResetAll}
         hasActiveAnalysis={Boolean(analysisResult || selectedImage)}
+        onOpenTrainingModal={() => setIsTrainingModalOpen(true)}
+        activeModelName={activeModelName}
       />
 
       {/* 2. Hero Section */}
@@ -92,11 +111,11 @@ export default function App() {
       {/* 3. Main Workspace Grid */}
       <main
         id="screening-workspace"
-        className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-12"
+        className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-6"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Left Column (7 cols): Upload -> Progress -> Result Card */}
-          <div className="lg:col-span-7 flex flex-col gap-6">
+          <div className="lg:col-span-7 flex flex-col gap-5">
             {!analysisResult && !isAnalyzing && (
               <ImageUploader
                 onImageSelected={handleImageSelected}
@@ -118,6 +137,7 @@ export default function App() {
                 onAskChatbot={handleAskChatbot}
                 onStartNewAnalysis={handleResetAll}
                 onOpenHeatmapModal={() => setIsHeatmapModalOpen(true)}
+                onOpenTrainingModal={() => setIsTrainingModalOpen(true)}
               />
             )}
           </div>
@@ -128,6 +148,9 @@ export default function App() {
               analysisResult={analysisResult}
               externalQueryTrigger={externalChatTrigger}
               onClearTrigger={() => setExternalChatTrigger(null)}
+              onImageUpload={(imageDataUrl, info) => {
+                handleImageSelected(imageDataUrl, info, true);
+              }}
             />
           </div>
         </div>
@@ -140,7 +163,14 @@ export default function App() {
         result={analysisResult}
       />
 
-      {/* 5. Medical Safety & Educational Footer */}
+      {/* 5. AI Models & Neural Network Training Studio Modal */}
+      <ModelTrainingStudioModal
+        isOpen={isTrainingModalOpen}
+        onClose={() => setIsTrainingModalOpen(false)}
+        onModelUpdated={(id, name) => setActiveModelName(name)}
+      />
+
+      {/* 6. Medical Safety & Educational Footer */}
       <MedicalDisclaimer />
     </div>
   );

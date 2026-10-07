@@ -10,12 +10,18 @@ import {
   ArrowRight,
   FileText,
   Info,
+  Camera,
 } from 'lucide-react';
 import { SAMPLE_PRESETS } from '../services/mockDermService';
 import { SamplePreset } from '../types';
+import { CameraCaptureModal } from './CameraCaptureModal';
 
 interface ImageUploaderProps {
-  onImageSelected: (imageDataUrl: string, fileInfo: { name: string; size: string; presetId?: string }) => void;
+  onImageSelected: (
+    imageDataUrl: string,
+    fileInfo: { name: string; size: string; presetId?: string },
+    immediateAnalyze?: boolean
+  ) => void;
   selectedImage: string | null;
   fileInfo: { name: string; size: string; presetId?: string; dimensions?: { width: number; height: number } } | null;
   onAnalyze: () => void;
@@ -33,6 +39,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (file: File) => {
@@ -99,18 +106,58 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     });
   };
 
+  const handleCameraCaptureConfirm = (capturedDataUrl: string, immediateAnalyze: boolean = false) => {
+    setErrorMessage(null);
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const estimatedKb = Math.max(1, Math.round((capturedDataUrl.length * 3) / 4 / 1024));
+    onImageSelected(
+      capturedDataUrl,
+      {
+        name: `camera_snapshot_${dateStr}.jpg`,
+        size: `${estimatedKb} KB (Live Camera)`,
+      },
+      immediateAnalyze
+    );
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col gap-5">
+      {/* Live Real-time Camera Modal */}
+      <CameraCaptureModal
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onCaptureConfirm={handleCameraCaptureConfirm}
+        onSelectFileInstead={() => {
+          setIsCameraOpen(false);
+          fileInputRef.current?.click();
+        }}
+      />
+
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-teal-50 text-teal-600">
             <ImageIcon className="w-4 h-4" />
           </div>
           <h2 className="text-base font-bold text-slate-800">
-            {selectedImage ? 'Image Preview & Validation' : 'Upload Skin Lesion Image'}
+            {selectedImage ? 'Image Preview & Validation' : 'Upload or Capture Skin Lesion'}
           </h2>
         </div>
-        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Step 1 of 2</span>
+
+        <div className="flex items-center gap-2">
+          {!selectedImage && (
+            <button
+              type="button"
+              id="header-camera-trigger-btn"
+              onClick={() => setIsCameraOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-semibold transition-colors border border-teal-200/80"
+              title="Open Real-time Camera"
+            >
+              <Camera className="w-3.5 h-3.5 text-teal-600" />
+              <span>Use Camera</span>
+            </button>
+          )}
+          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Step 1 of 2</span>
+        </div>
       </div>
 
       {errorMessage && (
@@ -136,8 +183,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-8 sm:p-10 text-center cursor-pointer transition-all duration-200 ${
+            className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-6 sm:p-9 text-center transition-all duration-200 ${
               isDragOver
                 ? 'border-teal-500 bg-teal-50/60 scale-[0.99]'
                 : 'border-slate-200 hover:border-teal-500 hover:bg-slate-50/80'
@@ -151,24 +197,53 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               className="hidden"
             />
 
-            <div className="w-13 h-13 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 mb-3 group-hover:scale-105 transition-transform">
-              <UploadCloud className="w-6 h-6 stroke-[2]" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 group-hover:scale-105 transition-transform">
+                <UploadCloud className="w-6 h-6 stroke-[2]" />
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-teal-700 group-hover:scale-105 transition-transform">
+                <Camera className="w-6 h-6 stroke-[2]" />
+              </div>
             </div>
 
             <p className="text-base font-bold text-slate-800 mb-1">
-              {isDragOver ? 'Drop image to analyze' : 'Upload a skin-lesion image'}
+              {isDragOver ? 'Drop image to analyze' : 'Select or Capture Skin Lesion Image'}
             </p>
             <p className="text-xs sm:text-sm text-slate-500 max-w-sm mb-4">
-              Drag & drop your image here or browse from your device
+              Take a live photo on the spot or drag & drop an image from your device
             </p>
 
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 text-white text-xs sm:text-sm font-semibold shadow-xs group-hover:bg-teal-700 transition-colors">
-              <UploadCloud className="w-4 h-4" />
-              <span>Choose Image</span>
+            {/* Dual Action CTAs: Choose Image & Realtime Camera */}
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              <button
+                type="button"
+                id="open-camera-spot-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCameraOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-xs sm:text-sm font-semibold shadow-xs hover:bg-teal-700 active:scale-98 transition-all"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Take Photo on Spot</span>
+              </button>
+
+              <button
+                type="button"
+                id="browse-file-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-xs hover:bg-slate-700 active:scale-98 transition-all"
+              >
+                <UploadCloud className="w-4 h-4" />
+                <span>Browse File</span>
+              </button>
             </div>
 
-            <p className="text-[11px] text-slate-400 mt-3">
-              Supported formats: JPG, JPEG, PNG (Max 15MB)
+            <p className="text-[11px] text-slate-400 mt-3.5">
+              Supported formats: JPG, JPEG, PNG (Max 15MB) • Camera with auto-centering reticle
             </p>
           </div>
 
@@ -214,7 +289,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               className="max-h-72 w-auto object-contain rounded-xl shadow-xs"
             />
             <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 text-white text-[10px] font-medium rounded-md backdrop-blur-md">
-              Original Image
+              {fileInfo?.name?.startsWith('camera_') ? 'Camera Snapshot' : 'Original Image'}
             </div>
           </div>
 
@@ -245,7 +320,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           {/* Action buttons */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                id="preview-camera-retake-btn"
+                onClick={() => setIsCameraOpen(true)}
+                disabled={isAnalyzing}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-teal-200 bg-teal-50 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-colors disabled:opacity-50 shadow-2xs"
+              >
+                <Camera className="w-3.5 h-3.5 text-teal-600" />
+                <span>Take New Photo</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -253,7 +339,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 shadow-2xs"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-                <span>Replace Image</span>
+                <span>Replace File</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -277,6 +363,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             {/* Primary CTA */}
             <button
               type="button"
+              id="analyze-lesion-cta"
               onClick={onAnalyze}
               disabled={isAnalyzing}
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all disabled:opacity-50"

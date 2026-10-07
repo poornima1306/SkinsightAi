@@ -1,6 +1,8 @@
 {
   "name": "SkinSight AI",
-  "description": "AI-assisted skin lesion screening and guidance prototype with explainable Grad-CAM visualization and interactive assistant.",
-  "requestFramePermissions": [],
+  "description": "Multi-algorithm AI skin lesion screening prototype with Vision Transformers, Deep CNNs, and Machine Learning training studio.",
+  "requestFramePermissions": [
+    "camera"
+  ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
